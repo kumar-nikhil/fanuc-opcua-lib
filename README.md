@@ -1,6 +1,6 @@
-# fanuc-opcua
+# Fanuc OPC UA Library (`fanuc-opcua-lib`)
 
-An easy-to-use, pythonic OPC UA client library for communicating with Fanuc Robot controllers.
+> A Pythonic, asynchronous OPC UA abstraction library for Fanuc robots. Seamlessly monitor system states, perform position tracking, and interact with native Modbus I/O and Register arrays.
 
 ## Overview
 Fanuc robots that have the OPC UA server option enabled expose various information arrays including Registers, Strings, Current Position, and Operational Status. 

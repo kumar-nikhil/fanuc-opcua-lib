@@ -26,5 +26,5 @@ wheels/
 .coverage
 htmlcov/
 .mypy_cache/
-.idea/
 .vscode/
+robot_data.json
