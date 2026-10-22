@@ -4,16 +4,29 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "fanuc-opcua"
-version = "0.1.0"
-description = "An easy to use Python OPC UA client library specifically for Fanuc robot controllers."
+version = "0.2.0"
+description = "Read and write FANUC robot I/O, registers and positions over the controller's built-in OPC UA server."
 readme = "README.md"
 authors = [
     {name = "Nikhil Kumar"}
 ]
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 dependencies = [
     "asyncua>=1.0.5"
 ]
+keywords = ["fanuc", "robot", "opc-ua", "opcua", "roboguide", "industrial-automation"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Framework :: AsyncIO",
+    "Topic :: Scientific/Engineering",
+    "Intended Audience :: Manufacturing",
+]
+
+[project.urls]
+Homepage = "https://github.com/kumar-nikhil/fanuc-opcua-lib"
+
+[project.scripts]
+fanuc-opcua = "fanuc_opcua.cli:main"
 
 [project.optional-dependencies]
 dev = [
@@ -23,3 +36,9 @@ dev = [
 
 [tool.setuptools.packages.find]
 include = ["fanuc_opcua*"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+markers = [
+    "roboguide: needs a live controller; set FANUC_TEST_HOST (e.g. 127.0.0.2) to run",
+]
