@@ -24,6 +24,7 @@ from ..cli import parse_assignment, to_jsonable
 from ..client import SYSVAR_TYPES, FanucClient
 from ..errors import CommunicationError, FanucConnectionError, FanucError, NotConnectedError
 from ..nodes import DEFAULT_PORT, ROBOGUIDE_HOST
+from .connection_test import run_test, validate_host
 
 logger = logging.getLogger(__name__)
 
@@ -161,10 +162,11 @@ class RobotSession:
         return self.robot is not None and self.robot.connected
 
     async def connect(self, host: str, port: int) -> None:
+        """Switch to a robot. The current connection is kept if the new one fails."""
         async with self._connect_lock:
-            await self._drop()
             robot = FanucClient(host, port, self.timeout)
             await robot.connect()
+            await self._drop()
             self.host, self.port, self.robot = host, port, robot
             self.connected_at = time.time()
             self.last_error = None
@@ -310,10 +312,18 @@ async def session_info(request: web.Request) -> web.Response:
 async def connect(request: web.Request) -> web.Response:
     s = _session(request)
     data = await _body(request)
-    host = str(data.get("host") or s.host).strip()
+    host = validate_host(str(data.get("host") or s.host))
     port = int(data.get("port") or s.port)
     await s.connect(host, port)
     return _ok(**s.describe())
+
+
+async def test_connection(request: web.Request) -> web.Response:
+    """Ping, port and OPC UA session check for a robot; does not touch the current connection."""
+    s = _session(request)
+    data = await _body(request)
+    result = await run_test(str(data.get("host") or ""), int(data.get("port") or DEFAULT_PORT), s.timeout)
+    return _ok(**result)
 
 
 async def disconnect(request: web.Request) -> web.Response:
@@ -410,6 +420,7 @@ def create_app(host: str = ROBOGUIDE_HOST, port: int = DEFAULT_PORT, read_only: 
     app.router.add_get("/api/session", session_info)
     app.router.add_post("/api/connect", connect)
     app.router.add_post("/api/disconnect", disconnect)
+    app.router.add_post("/api/test_connection", test_connection)
     app.router.add_get("/api/live", live)
     app.router.add_post("/api/read", read)
     app.router.add_post("/api/read_many", read_many)

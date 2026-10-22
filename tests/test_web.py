@@ -206,3 +206,48 @@ def test_find_free_port_skips_busy_port():
         busy.bind(("127.0.0.1", first))
         busy.listen()
         assert find_free_port("127.0.0.1", first) == first + 1
+
+
+def _closed_port():
+    import socket
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        return s.getsockname()[1]  # nothing listens here once the socket is closed
+
+
+@pytest.mark.parametrize("host", ["192.168.1.10", "robot-cell3.local", "127.0.0.2"])
+def test_validate_host_accepts(host):
+    from fanuc_opcua.web.connection_test import validate_host
+    assert validate_host(f" {host} ") == host
+
+
+@pytest.mark.parametrize("host", ["", "1.2.3.4; del x", "a & calc", "-n 5 host", "x" * 300, "http://1.2.3.4"])
+def test_validate_host_rejects(host):
+    from fanuc_opcua.web.connection_test import validate_host
+    with pytest.raises(ValueError):
+        validate_host(host)
+
+
+async def test_connection_test_reports_refused_port(gui):
+    client, _ = gui
+    res = await (await client.post("/api/test_connection", json={"host": "127.0.0.1", "port": _closed_port()})).json()
+    assert res["ok"] is True and res["passed"] is False
+    names = [st["name"] for st in res["steps"]]
+    assert names == ["Ping", "OPC UA port", "OPC UA session"]
+    port_step, session_step = res["steps"][1], res["steps"][2]
+    assert port_step["ok"] is False and "refused" in port_step["detail"] and port_step["hint"]
+    assert session_step["ok"] is None
+
+
+async def test_connection_test_rejects_bad_host(gui):
+    client, _ = gui
+    res = await client.post("/api/test_connection", json={"host": "1.2.3.4 & calc", "port": 4880})
+    assert res.status == 400
+
+
+async def test_failed_switch_keeps_current_robot(gui):
+    client, _ = gui
+    res = await client.post("/api/connect", json={"host": "127.0.0.1", "port": _closed_port()})
+    assert res.status == 503
+    data = await (await client.get("/api/session")).json()
+    assert data["connected"] is True and data["host"] == "127.0.0.2"

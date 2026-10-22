@@ -234,8 +234,8 @@ the browser — refreshing alone keeps the old server running.
 
 ### The screen
 
-- **Header** — robot IP and port with **Connect** / **Disconnect** (switch robots without restarting),
-  a green/red connection indicator, and the **Writes locked** switch.
+- **Header** — robot IP and port with **Test**, **Connect** / **Disconnect**, a green/red connection
+  indicator, and the **Writes locked** switch. See [Switching robots](#switching-robots).
 - **Robot** — model, controller, software version, serial number and power-on time.
 - **Status** — mode, servo, e-stop, protective stop and colored state flags (RUNNING, PAUSED, FAULT, …).
   Active alarms appear in a red banner at the top of the page.
@@ -252,6 +252,23 @@ the browser — refreshing alone keeps the old server running.
 - **Watch list** tab — any addresses, refreshed every second, with changes highlighted. *Add demo set*
   fills in a typical set. The list is remembered by the browser.
 - **Activity log** tab — every read and write made from the page, with its timing.
+
+### Switching robots
+
+No command-line options are needed to work with another robot:
+
+1. Type the robot's IP (and port, if it is not 4880) in the header. The boxes turn amber while the
+   address differs from the connected robot; **Esc** puts the current one back.
+2. Press **Enter** or click **Test**. Three checks run without touching the current connection:
+
+   | Check | Passes when | If it fails |
+   |---|---|---|
+   | Ping | the robot replies | wrong IP, PC not on the robot's subnet, cable on CD38C, or Wi-Fi taking the traffic (some networks block ping; the other checks still run) |
+   | OPC UA port | TCP port 4880 accepts a connection | *refused*: OPC UA server not available (software/option) or wrong port; *no answer*: wrong IP, robot off, or a firewall/VLAN |
+   | OPC UA session | a session opens and the robot model is read | not a FANUC OPC UA server, or 10 clients already connected |
+
+3. Click **Connect to this robot** (or **Connect** in the header). If the new robot cannot be reached,
+   the GUI stays connected to the previous one and shows the test results.
 
 ### Reading the communication chart
 

@@ -98,6 +98,14 @@ td.num, th.num { text-align: right; font-family: var(--mono); }
 .log div { padding: 3px 0; border-bottom: 1px dashed var(--line); }
 .log .e { color: var(--red); }
 .comm { grid-column: 1 / -1; }
+header input.edited { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.step { display: grid; grid-template-columns: 28px 140px 1fr auto; gap: 10px; align-items: start; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.step:last-child { border-bottom: none; }
+.step .icon { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; font-size: 13px; background: var(--grey-bg); color: var(--muted); }
+.step .icon.ok { background: var(--green-bg); color: var(--green); }
+.step .icon.bad { background: var(--red-bg); color: var(--red); }
+.step .hint { grid-column: 3 / -1; margin-top: 2px; }
+@media (max-width: 600px) { .step { grid-template-columns: 28px 1fr auto; } .step .detail, .step .hint { grid-column: 2 / -1; } }
 .scroll-x { overflow-x: auto; }
 .comm-body { display: grid; grid-template-columns: minmax(220px, 300px) 1fr; gap: 28px; align-items: start; }
 @media (max-width: 760px) { .comm-body { grid-template-columns: 1fr; } }
@@ -134,8 +142,9 @@ td.num, th.num { text-align: right; font-family: var(--mono); }
 <header>
   <div class="brand"><span class="logo">FANUC</span> OPC UA Console <small id="endpoint"></small></div>
   <span id="connPill" class="pill"><span class="dot"></span><span>Connecting…</span></span>
-  <label>Robot IP <input id="host" type="text" size="13" aria-label="Robot IP address"></label>
-  <label>Port <input id="port" type="text" size="5" aria-label="OPC UA port"></label>
+  <label>Robot IP <input id="host" type="text" size="15" aria-label="Robot IP address" placeholder="e.g. 192.168.1.10" spellcheck="false"></label>
+  <label>Port <input id="port" type="text" size="5" aria-label="OPC UA port" inputmode="numeric"></label>
+  <button id="testBtn" title="Ping the robot and check its OPC UA server without changing the current connection">Test</button>
   <button id="connectBtn" class="primary">Connect</button>
   <button id="disconnectBtn">Disconnect</button>
   <label class="switch" title="Writes change real robot data. Keep off unless you mean it.">
@@ -144,6 +153,16 @@ td.num, th.num { text-align: right; font-family: var(--mono); }
 </header>
 
 <main>
+  <section class="card" id="testBox" hidden aria-live="polite">
+    <h2>Connection test <span class="mono" id="testTarget" style="text-transform:none;letter-spacing:0;color:var(--text)"></span></h2>
+    <div id="testSteps"></div>
+    <div class="actions" style="margin-top:12px">
+      <button id="testConnect" class="primary">Connect to this robot</button>
+      <button id="testAgain">Test again</button>
+      <button id="testClose" class="ghost">Close</button>
+      <span class="hint" id="testNote"></span>
+    </div>
+  </section>
   <div id="alarmBox" class="alarm"></div>
 
   <section class="grid">
@@ -381,14 +400,14 @@ $("confirmNo").onclick = () => { $("confirmBox").style.display = "none"; confirm
 function renderSession(s) {
   state.connected = s.connected;
   state.readOnly = s.read_only;
-  if (document.activeElement !== $("host")) $("host").value = s.host;
-  if (document.activeElement !== $("port")) $("port").value = s.port;
+  // Keep what the user typed until they connect, test-connect or press Esc.
+  if (!state.editingTarget) { $("host").value = s.host; $("port").value = s.port; }
   $("endpoint").textContent = s.endpoint;
   const p = $("connPill");
   p.className = "pill " + (s.connected ? "ok" : "bad");
   p.lastElementChild.textContent = s.connected ? "Connected" : (s.last_error ? "Disconnected – " + s.last_error.slice(0, 60) : "Disconnected");
   p.title = s.last_error || "";
-  $("connectBtn").textContent = s.connected ? "Reconnect" : "Connect";
+  $("connectBtn").textContent = s.connected && !state.editingTarget ? "Reconnect" : "Connect";
   $("disconnectBtn").disabled = !s.connected;
   const info = s.info || {};
   $("iModel").textContent = info.model || "–";
@@ -539,18 +558,72 @@ async function pollLive() {
   setTimeout(pollLive, 1000);
 }
 
-$("connectBtn").onclick = async () => {
-  $("connectBtn").disabled = true;
-  $("connPill").lastElementChild.textContent = "Connecting…";
+function target() { return { host: $("host").value.trim(), port: Number($("port").value) || 4880 }; }
+function setEditing(on) {
+  state.editingTarget = on;
+  $("host").classList.toggle("edited", on);
+  $("port").classList.toggle("edited", on);
+  $("connectBtn").textContent = state.connected && !on ? "Reconnect" : "Connect";
+}
+for (const id of ["host", "port"]) {
+  $(id).addEventListener("input", () => setEditing(true));
+  $(id).addEventListener("keydown", (e) => {
+    if (e.key === "Enter") runTest();
+    if (e.key === "Escape") { setEditing(false); api("/api/session").then(renderSession).catch(() => {}); }
+  });
+}
+
+async function connectTo(t) {
+  $("connectBtn").disabled = $("testConnect").disabled = true;
+  $("connPill").lastElementChild.textContent = `Connecting to ${t.host}…`;
   try {
-    const s = await api("/api/connect", { host: $("host").value.trim(), port: Number($("port").value) });
+    const s = await api("/api/connect", t);
+    setEditing(false);
     renderSession(s);
+    $("testBox").hidden = true;
     logLine(`Connected to ${s.endpoint}`);
   } catch (e) {
-    logLine(`Connect failed: ${e.message}`, true);
-    alert(e.message);
+    logLine(`Connect to ${t.host}:${t.port} failed: ${e.message}`, true);
+    const previous = state.connected ? ` Still connected to ${$("endpoint").textContent.replace(/^opc\.tcp:\/\/|\/FANUC.*$/g, "")}.` : "";
+    await runTest(`Could not connect to ${t.host}.${previous}`);
   } finally { $("connectBtn").disabled = false; }
-};
+}
+$("connectBtn").onclick = () => connectTo(target());
+
+function renderSteps(steps) {
+  $("testSteps").innerHTML = steps.map((st) => {
+    const cls = st.ok === true ? "ok" : st.ok === false ? "bad" : "";
+    const icon = st.ok === true ? "✓" : st.ok === false ? "✕" : st.ok === "run" ? "…" : "–";
+    return `<div class="step"><span class="icon ${cls}">${icon}</span><b>${esc(st.name)}</b>
+      <span class="detail">${esc(st.detail)}</span><span class="mono muted">${st.ms != null ? st.ms + " ms" : ""}</span>
+      ${st.hint ? `<span class="hint">${esc(st.hint)}</span>` : ""}</div>`;
+  }).join("");
+}
+let lastTested = null;
+async function runTest(note = "") {
+  const t = target();
+  if (!t.host) { $("host").focus(); return; }
+  lastTested = t;
+  $("testBox").hidden = false;
+  $("testTarget").textContent = `${t.host}:${t.port}`;
+  $("testNote").textContent = note;
+  $("testConnect").disabled = true;
+  $("testBtn").disabled = $("testAgain").disabled = true;
+  renderSteps(["Ping", "OPC UA port", "OPC UA session"].map((name) => ({ name, ok: "run", detail: "checking…" })));
+  try {
+    const r = await api("/api/test_connection", t);
+    renderSteps(r.steps);
+    $("testConnect").disabled = !r.passed;
+    if (!note) $("testNote").textContent = r.passed ? "All checks passed." : "Fix the failed step, then test again.";
+    logLine(`TEST  ${t.host}:${t.port} ${r.passed ? "passed" : "failed"} — ${r.steps.map((st) => `${st.name}: ${st.ok === true ? "ok" : st.ok === false ? "FAIL" : "skipped"}`).join(", ")}`, !r.passed);
+  } catch (e) {
+    renderSteps([{ name: "Test", ok: false, detail: e.message }]);
+  } finally { $("testBtn").disabled = $("testAgain").disabled = false; }
+}
+$("testBtn").onclick = () => runTest();
+$("testAgain").onclick = () => runTest();
+$("testConnect").onclick = () => lastTested && connectTo(lastTested);
+$("testClose").onclick = () => { $("testBox").hidden = true; };
 $("disconnectBtn").onclick = async () => {
   try { renderSession(await api("/api/disconnect", {})); logLine("Disconnected"); } catch (e) { logLine(e.message, true); }
 };
