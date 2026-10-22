@@ -194,3 +194,15 @@ async def test_latency_history_is_labelled_by_operation(gui):
     assert ops == ["manual", "status", "program", "position"]
     ms, op, ok, ago = data["stats"]["history"][0]
     assert ms >= 0 and ok is True and ago >= 0
+
+
+def test_find_free_port_skips_busy_port():
+    import socket
+
+    from fanuc_opcua.web.server import find_free_port
+
+    first = find_free_port("127.0.0.1", 18080)
+    with socket.socket() as busy:
+        busy.bind(("127.0.0.1", first))
+        busy.listen()
+        assert find_free_port("127.0.0.1", first) == first + 1

@@ -12,6 +12,7 @@ from __future__ import annotations
 import asyncio
 import collections
 import logging
+import socket
 import time
 from pathlib import Path
 from typing import Any, Awaitable, Callable, Dict, List, Optional
@@ -431,13 +432,28 @@ def create_app(host: str = ROBOGUIDE_HOST, port: int = DEFAULT_PORT, read_only: 
     return app
 
 
+def find_free_port(bind: str, first: int = 8080, tries: int = 20) -> int:
+    """First port from `first` that can be bound on `bind`, so a busy 8080 is not fatal."""
+    for port in range(first, first + tries):
+        with socket.socket(socket.AF_INET6 if ":" in bind else socket.AF_INET) as s:
+            try:
+                s.bind((bind, port))
+                return port
+            except OSError:
+                continue
+    raise FanucError(f"No free port for the GUI between {first} and {first + tries - 1}; use --http-port")
+
+
 def run(robot_host: str = ROBOGUIDE_HOST, robot_port: int = DEFAULT_PORT, bind: str = "127.0.0.1",
-        http_port: int = 8080, read_only: bool = False, open_browser: bool = True,
+        http_port: Optional[int] = None, read_only: bool = False, open_browser: bool = True,
         timeout: float = 5.0) -> None:
+    """Serve the GUI. Without `http_port`, uses 8080 or the next free port."""
+    if http_port is None:
+        http_port = find_free_port(bind)
     url = f"http://{'127.0.0.1' if bind in ('0.0.0.0', '::') else bind}:{http_port}/"
     app = create_app(robot_host, robot_port, read_only, timeout=timeout)
     print(f"FANUC OPC UA GUI on {url}  (robot {robot_host}:{robot_port}"
-          f"{', read only' if read_only else ''}) - press Ctrl+C to stop")
+          f"{', read only' if read_only else ''}) - press Ctrl+C to stop", flush=True)
     if bind in ("0.0.0.0", "::"):
         print("Warning: the GUI is reachable from other computers on this network and has no login.")
     if open_browser:

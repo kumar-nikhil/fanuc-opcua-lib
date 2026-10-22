@@ -555,8 +555,9 @@ $("disconnectBtn").onclick = async () => {
   try { renderSession(await api("/api/disconnect", {})); logLine("Disconnected"); } catch (e) { logLine(e.message, true); }
 };
 
-$("allowWrites").checked = load("allowWrites", false);
-$("allowWrites").onchange = () => { store("allowWrites", $("allowWrites").checked); updateWriteButtons(); };
+// Writes always start locked on page load (not remembered) so a demo never begins unlocked.
+$("allowWrites").checked = false;
+$("allowWrites").onchange = updateWriteButtons;
 function updateWriteButtons() {
   const ok = writesAllowed();
   $("writesLabel").textContent = state.readOnly ? "Read-only server" : ok ? "Writes enabled" : "Writes locked";

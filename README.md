@@ -11,6 +11,7 @@ There are three ways to use it:
 | [**Python API**](#python-api) | scripts, cell controllers, data logging | `from fanuc_opcua import FanucClient` |
 | [**Command line**](#command-line) | quick checks and shell scripts | `fanuc-opcua read DO[1] R[5]` |
 | [**Browser GUI**](#browser-gui) | beginners, commissioning, customer demos | `fanuc-opcua web` |
+| [**Windows .exe**](#standalone-windows-exe) | any Windows PC, nothing to install | double-click `FANUC-OPCUA.exe` |
 
 ```python
 import asyncio
@@ -28,7 +29,8 @@ asyncio.run(main())
 
 **Contents:** [Requirements](#requirements) · [Installation](#installation) · [Connecting](#connecting) ·
 [Addresses](#addresses) · [Python API](#python-api) · [Command line](#command-line) ·
-[Browser GUI](#browser-gui) · [How it works](#how-it-works) · [Testing](#testing) · [Changes](#changes)
+[Browser GUI](#browser-gui) · [Standalone .exe](#standalone-windows-exe) · [How it works](#how-it-works) ·
+[Testing](#testing) · [Changes](#changes)
 
 ## Requirements
 
@@ -285,6 +287,50 @@ Controllers older than 7DF1/P28 or 7DF3/P06 do not have the status nodes. The GU
 the Robot card falls back to model and version read from system variables, the Status card shows
 *Not available*, and program, position, read & write, I/O panel and watch list work as usual.
 
+## Standalone Windows .exe
+
+`FANUC-OPCUA.exe` is a single file (about 25 MB) that contains Python, this library, the GUI and all
+dependencies. Copy it to any 64-bit Windows 10/11 PC — no Python, no installation, no internet needed.
+
+### Use it
+
+1. **Double-click `FANUC-OPCUA.exe`.** A console window opens and the GUI opens in the default browser
+   (the first start takes a few seconds while the file unpacks).
+2. It connects to ROBOGUIDE at `127.0.0.2`. For a real robot, type its IP in **Robot IP** at the top of
+   the page and click **Connect**.
+3. Keep the console window open while you work; **close it (or press Ctrl+C) to stop**.
+
+If port 8080 is busy the GUI uses 8081, 8082, … — the console window shows the address. Writes always
+start locked.
+
+The same file is also the command-line tool. Open a terminal in its folder:
+
+```bat
+FANUC-OPCUA.exe web --host 192.168.1.10 --read-only
+FANUC-OPCUA.exe info --host 192.168.1.10
+FANUC-OPCUA.exe read DO[1] R[5] PR[1]
+FANUC-OPCUA.exe write DO[1]=on R[5]=2.5
+FANUC-OPCUA.exe --help
+```
+
+The file is not code-signed, so Windows SmartScreen may show *"Windows protected your PC"* the first
+time: click **More info → Run anyway**. Some company antivirus tools quarantine unsigned single-file
+programs; ask IT to allow it, or build it yourself from source on that network.
+
+### Build it
+
+On a Windows PC with this repository and its development environment:
+
+```bat
+python -m venv .venv
+.venv\Scripts\python -m pip install -e ".[web,build]"
+.venv\Scripts\python packaging\build_exe.py
+```
+
+The result is `dist\FANUC-OPCUA.exe`. Stop any running GUI first, because Windows locks the program while
+it runs. [`packaging/launcher.py`](packaging/launcher.py) is the entry point and
+[`packaging/build_exe.py`](packaging/build_exe.py) the PyInstaller call.
+
 ## How it works
 
 The controller exposes four Modbus-style arrays and a command node in namespace 1:
@@ -343,7 +389,8 @@ original values afterwards. Do not run them against a production robot.
 
 ### 0.3
 
-- Browser GUI: `fanuc-opcua web` (optional `web` extra).
+- Browser GUI: `fanuc-opcua web` (optional `web` extra). Picks the next free port if 8080 is busy.
+- Standalone Windows `FANUC-OPCUA.exe` (double-click for the GUI; also the command line).
 - `RobotStatus.state_flags`; `fanuc-opcua --json status` includes the flag names.
 - Master check script `examples/roboguide_check.py`.
 

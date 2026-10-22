@@ -184,7 +184,7 @@ def build_parser() -> argparse.ArgumentParser:
     m.add_argument("-i", "--interval", type=float, default=0.5, help="poll interval in seconds")
 
     g = sub.add_parser("web", parents=[common], help="start the browser GUI (needs: pip install fanuc-opcua[web])")
-    g.add_argument("--http-port", type=int, default=8080, help="port of the GUI web page (default 8080)")
+    g.add_argument("--http-port", type=int, default=None, help="port of the GUI web page (default 8080, or the next free one)")
     g.add_argument("--bind", default="127.0.0.1",
                    help="interface to serve on; use 0.0.0.0 to allow other computers (no login!)")
     g.add_argument("--read-only", action="store_true", help="disable all writes in the GUI")
