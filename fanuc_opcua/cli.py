@@ -182,11 +182,32 @@ def build_parser() -> argparse.ArgumentParser:
     m = sub.add_parser("watch", parents=[common], help="print values whenever they change (Ctrl+C to stop)")
     m.add_argument("addresses", nargs="+", metavar="ADDRESS")
     m.add_argument("-i", "--interval", type=float, default=0.5, help="poll interval in seconds")
+
+    g = sub.add_parser("web", parents=[common], help="start the browser GUI (needs: pip install fanuc-opcua[web])")
+    g.add_argument("--http-port", type=int, default=8080, help="port of the GUI web page (default 8080)")
+    g.add_argument("--bind", default="127.0.0.1",
+                   help="interface to serve on; use 0.0.0.0 to allow other computers (no login!)")
+    g.add_argument("--read-only", action="store_true", help="disable all writes in the GUI")
+    g.add_argument("--no-browser", action="store_true", help="do not open a browser window")
     return p
+
+
+def _run_web(args: argparse.Namespace) -> int:
+    try:
+        from .web.server import run
+    except ImportError as e:
+        print(f"error: the GUI needs aiohttp ({e}). Install it with: pip install \"fanuc-opcua[web]\"",
+              file=sys.stderr)
+        return 1
+    run(args.host, args.port, bind=args.bind, http_port=args.http_port,
+        read_only=args.read_only, open_browser=not args.no_browser, timeout=args.timeout)
+    return 0
 
 
 def main(argv: Optional[List[str]] = None) -> int:
     args = build_parser().parse_args(argv)
+    if args.command == "web":
+        return _run_web(args)
     try:
         return asyncio.run(_run(args))
     except KeyboardInterrupt:

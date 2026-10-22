@@ -1,0 +1,881 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FANUC OPC UA Console</title>
+<style>
+:root {
+  --bg: #f4f5f7; --panel: #ffffff; --panel-2: #f8f9fb; --text: #1c2026; --muted: #667085; --line: #e3e6eb;
+  --accent: #f2b705; --accent-text: #1c2026; --blue: #2563eb; --green: #16a34a; --red: #dc2626; --amber: #d97706;
+  --green-bg: #dcfce7; --red-bg: #fee2e2; --amber-bg: #fef3c7; --blue-bg: #dbeafe; --grey-bg: #eef0f3;
+  --led-off: #d0d5dd; --shadow: 0 1px 2px rgba(16,24,40,.06), 0 1px 3px rgba(16,24,40,.08);
+  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100; --grid: #e9ebef;
+  --mono: ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f1216; --panel: #171b21; --panel-2: #1d222a; --text: #e6e8eb; --muted: #98a2b3; --line: #2a3039;
+    --green-bg: #12301f; --red-bg: #3a1618; --amber-bg: #36290d; --blue-bg: #14264a; --grey-bg: #232932;
+    --led-off: #3a414c; --shadow: none;
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --grid: #262c35;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+header { position: sticky; top: 0; z-index: 10; background: #1c2026; color: #fff; display: flex; flex-wrap: wrap; gap: 12px; align-items: center; padding: 10px 20px; }
+.brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 16px; margin-right: auto; }
+.brand .logo { background: var(--accent); color: #1c2026; border-radius: 6px; padding: 3px 8px; font-size: 13px; letter-spacing: .5px; }
+.brand small { font-weight: 400; color: #aab2bf; }
+header input { background: #2a3039; border: 1px solid #3a414c; color: #fff; border-radius: 6px; padding: 6px 8px; font: inherit; }
+header label { color: #aab2bf; font-size: 12px; display: flex; align-items: center; gap: 6px; }
+main { max-width: 1400px; margin: 0 auto; padding: 18px 20px 40px; display: grid; gap: 16px; }
+.grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+.grid-2 { display: grid; gap: 16px; grid-template-columns: 3fr 2fr; }
+@media (max-width: 900px) { .grid-2 { grid-template-columns: 1fr; } }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; box-shadow: var(--shadow); min-width: 0; }
+.card h2 { margin: 0 0 10px; font-size: 12px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); font-weight: 600; display: flex; align-items: center; gap: 8px; }
+.kv { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; }
+.kv dt { color: var(--muted); }
+.kv dd { margin: 0; font-weight: 600; text-align: right; overflow-wrap: anywhere; }
+.big { font-size: 26px; font-weight: 700; }
+.pill { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 2px 10px; font-size: 12px; font-weight: 600; background: var(--grey-bg); color: var(--text); white-space: nowrap; }
+.pill.ok { background: var(--green-bg); color: var(--green); }
+.pill.bad { background: var(--red-bg); color: var(--red); }
+.pill.warn { background: var(--amber-bg); color: var(--amber); }
+.pill.info { background: var(--blue-bg); color: var(--blue); }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+header .pill { background: #2a3039; color: #cfd4dc; }
+header .pill.ok { background: #14532d; color: #86efac; }
+header .pill.bad { background: #5b1a1a; color: #fca5a5; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+button { font: inherit; border-radius: 6px; border: 1px solid var(--line); background: var(--panel-2); color: var(--text); padding: 6px 12px; cursor: pointer; font-weight: 600; }
+button:hover:not(:disabled) { border-color: var(--muted); }
+button:disabled { opacity: .45; cursor: not-allowed; }
+button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+button.danger { background: var(--red); border-color: var(--red); color: #fff; }
+button.ghost { background: transparent; }
+header button { border-color: #3a414c; background: #2a3039; color: #fff; }
+header button.primary { background: var(--accent); color: #1c2026; border-color: var(--accent); }
+select, input[type=text], input[type=number] { font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; min-width: 0; }
+.bar { height: 8px; border-radius: 4px; background: var(--grey-bg); overflow: hidden; }
+.bar > span { display: block; height: 100%; background: var(--blue); border-radius: 4px; transition: width .3s; }
+.alarm { background: var(--red-bg); color: var(--red); border: 1px solid var(--red); border-radius: 10px; padding: 10px 16px; font-weight: 600; display: none; }
+.alarm ul { margin: 4px 0 0; padding-left: 18px; font-weight: 500; }
+table { width: 100%; border-collapse: collapse; }
+th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+th { color: var(--muted); font-weight: 600; font-size: 12px; }
+td.num, th.num { text-align: right; font-family: var(--mono); }
+.mono { font-family: var(--mono); }
+.muted { color: var(--muted); }
+.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin: -4px -16px 14px; padding: 0 12px; overflow-x: auto; }
+.tabs button { border: none; border-bottom: 2px solid transparent; border-radius: 0; background: none; padding: 10px 12px; color: var(--muted); }
+.tabs button.active { color: var(--text); border-bottom-color: var(--accent); }
+.tab { display: none; }
+.tab.active { display: block; }
+.form { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); align-items: end; }
+.field { display: grid; gap: 4px; }
+.field > span { font-size: 12px; color: var(--muted); font-weight: 600; }
+.hint { font-size: 12px; color: var(--muted); }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.result { margin-top: 14px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 12px; min-height: 48px; }
+.result.err { border-color: var(--red); color: var(--red); }
+.address { font-family: var(--mono); font-weight: 700; font-size: 18px; }
+.posgrid { display: grid; grid-template-columns: repeat(6, minmax(70px, 1fr)); gap: 8px; }
+@media (max-width: 600px) { .posgrid { grid-template-columns: repeat(3, 1fr); } }
+.posgrid label { display: grid; gap: 2px; font-size: 12px; color: var(--muted); font-weight: 600; }
+.posgrid input { width: 100%; font-family: var(--mono); }
+.leds { display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: 8px; }
+.led { border: 1px solid var(--line); border-radius: 8px; padding: 8px 4px; text-align: center; background: var(--panel-2); font-family: var(--mono); font-size: 12px; user-select: none; }
+.led i { display: block; width: 18px; height: 18px; margin: 0 auto 4px; border-radius: 50%; background: var(--led-off); }
+.led.on i { background: var(--green); box-shadow: 0 0 8px var(--green); }
+.led.click { cursor: pointer; }
+.led.click:hover { border-color: var(--muted); }
+.led .v { font-weight: 700; font-size: 13px; }
+.flash { animation: flash 1.2s ease-out; }
+@keyframes flash { from { background: var(--amber-bg); } to { background: transparent; } }
+.log { max-height: 360px; overflow: auto; font-family: var(--mono); font-size: 12px; }
+.log div { padding: 3px 0; border-bottom: 1px dashed var(--line); }
+.log .e { color: var(--red); }
+.comm { grid-column: 1 / -1; }
+.scroll-x { overflow-x: auto; }
+.comm-body { display: grid; grid-template-columns: minmax(220px, 300px) 1fr; gap: 28px; align-items: start; }
+@media (max-width: 760px) { .comm-body { grid-template-columns: 1fr; } }
+.lat { margin: 0; min-width: 0; }
+.lat-title { font-size: 12px; font-weight: 600; margin-bottom: 6px; }
+.lat-plot { position: relative; }
+.lat-plot svg { display: block; width: 100%; height: 140px; overflow: visible; }
+.lat-plot .tick { font: 11px var(--mono); fill: var(--muted); }
+.lat-plot .gridline { stroke: var(--grid); stroke-width: 1; }
+.lat-plot .baseline { stroke: var(--line); stroke-width: 1; }
+.lat-plot .hit { fill: transparent; cursor: default; }
+.lat-plot .hit:hover + .bar, .lat-plot .bar.hover { filter: brightness(1.12); }
+.lat-axis { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); padding-left: 44px; margin-top: 2px; }
+.lat-legend { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 10px; font-size: 12px; }
+.lat-legend .item { display: inline-flex; align-items: center; gap: 6px; }
+.lat-legend .sw { width: 10px; height: 10px; border-radius: 2px; flex: none; }
+.lat-legend b { font-family: var(--mono); font-weight: 600; }
+.lat-tip { position: absolute; pointer-events: none; display: none; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,.12); padding: 6px 10px; font-size: 12px; white-space: nowrap; z-index: 2; }
+.lat-tip .sw { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 6px; }
+.switch { position: relative; display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
+.switch input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.switch input:focus-visible + .track { outline: 2px solid var(--accent); outline-offset: 2px; }
+.switch .track { width: 34px; height: 18px; border-radius: 9px; background: #3a414c; position: relative; transition: background .2s; }
+.switch .track::after { content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: #fff; transition: left .2s; }
+.switch input:checked + .track { background: var(--red); }
+.switch input:checked + .track::after { left: 18px; }
+.overlay { position: fixed; inset: 0; background: rgba(15,18,22,.55); display: none; align-items: center; justify-content: center; z-index: 20; }
+.overlay .card { max-width: 440px; }
+.torque-row { display: grid; grid-template-columns: 34px 1fr 64px; gap: 8px; align-items: center; font-size: 12px; margin: 4px 0; }
+.empty { text-align: center; color: var(--muted); padding: 18px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand"><span class="logo">FANUC</span> OPC UA Console <small id="endpoint"></small></div>
+  <span id="connPill" class="pill"><span class="dot"></span><span>Connecting…</span></span>
+  <label>Robot IP <input id="host" type="text" size="13" aria-label="Robot IP address"></label>
+  <label>Port <input id="port" type="text" size="5" aria-label="OPC UA port"></label>
+  <button id="connectBtn" class="primary">Connect</button>
+  <button id="disconnectBtn">Disconnect</button>
+  <label class="switch" title="Writes change real robot data. Keep off unless you mean it.">
+    <input id="allowWrites" type="checkbox"><span class="track"></span><span id="writesLabel">Writes locked</span>
+  </label>
+</header>
+
+<main>
+  <div id="alarmBox" class="alarm"></div>
+
+  <section class="grid">
+    <div class="card">
+      <h2>Robot</h2>
+      <dl class="kv">
+        <dt>Model</dt><dd id="iModel">–</dd>
+        <dt>Controller</dt><dd id="iController">–</dd>
+        <dt>Software</dt><dd id="iSoftware">–</dd>
+        <dt>Serial</dt><dd id="iSerial">–</dd>
+        <dt>Power-on time</dt><dd id="iUptime">–</dd>
+      </dl>
+    </div>
+
+    <div class="card">
+      <h2>Status</h2>
+      <div class="chips" id="sChips" style="margin-bottom:10px"><span class="pill">–</span></div>
+      <dl class="kv">
+        <dt>Mode</dt><dd id="sMode">–</dd>
+        <dt>Servo</dt><dd id="sServo">–</dd>
+        <dt>Emergency stop</dt><dd id="sEstop">–</dd>
+        <dt>Protective stop</dt><dd id="sPstop">–</dd>
+      </dl>
+    </div>
+
+    <div class="card">
+      <h2>Speed override</h2>
+      <div class="big"><span id="sOverride">–</span><span class="muted" style="font-size:16px">%</span></div>
+      <div class="bar" style="margin:8px 0 12px"><span id="sOverrideBar" style="width:0"></span></div>
+      <div class="actions">
+        <input id="overrideSlider" type="range" min="1" max="100" value="100" style="flex:1" aria-label="New speed override">
+        <span id="overrideNew" class="mono" style="width:3em;text-align:right">100%</span>
+        <button id="overrideSet" class="write-btn">Set</button>
+      </div>
+      <div class="hint">Writes $MCR.$GENOVERRIDE</div>
+    </div>
+
+    <div class="card">
+      <h2>Program</h2>
+      <div class="big mono" id="pName" style="font-size:20px">–</div>
+      <dl class="kv" style="margin-top:8px">
+        <dt>State</dt><dd id="pState">–</dd>
+        <dt>Line</dt><dd id="pLine">–</dd>
+        <dt>Started from</dt><dd id="pParent">–</dd>
+      </dl>
+    </div>
+
+    <div class="card comm">
+      <h2>Communication</h2>
+      <div class="comm-body">
+        <dl class="kv">
+          <dt>Last request</dt><dd id="cLast">–</dd>
+          <dt>Average / max</dt><dd id="cAvg">–</dd>
+          <dt>Dashboard refresh</dt><dd id="cCycle">–</dd>
+          <dt>Requests / s</dt><dd id="cRate">–</dd>
+          <dt>Reads · writes · errors</dt><dd id="cCounts">–</dd>
+          <dt>Connected for</dt><dd id="cFor">–</dd>
+        </dl>
+        <figure class="lat">
+          <figcaption class="lat-title">Time taken by each recent request <span class="muted">(one bar per request, newest on the right)</span></figcaption>
+          <div class="lat-plot" id="latPlot">
+            <svg id="latSvg" role="img" aria-label="Bar chart of recent request times"></svg>
+            <div class="lat-tip" id="latTip" role="status"></div>
+          </div>
+          <div class="lat-axis"><span>← older</span><span>now</span></div>
+          <div class="lat-legend" id="latLegend"></div>
+          <p class="hint" style="margin:6px 0 0">The dashboard refreshes once a second with three requests: status (about 10 OPC UA reads, so the tallest bar), program and position. Faded bars failed. Hover a bar for details.</p>
+        </figure>
+      </div>
+    </div>
+  </section>
+
+  <section class="grid-2">
+    <div class="card">
+      <h2>Current position <span class="pill" id="posFrame">World</span></h2>
+      <div class="scroll-x"><table>
+        <thead><tr><th></th><th class="num">X mm</th><th class="num">Y mm</th><th class="num">Z mm</th><th class="num">W °</th><th class="num">P °</th><th class="num">R °</th></tr></thead>
+        <tbody><tr><th>Cartesian</th><td class="num" id="px">–</td><td class="num" id="py">–</td><td class="num" id="pz">–</td><td class="num" id="pw">–</td><td class="num" id="pp">–</td><td class="num" id="pr">–</td></tr></tbody>
+        <thead><tr><th></th><th class="num">J1 °</th><th class="num">J2 °</th><th class="num">J3 °</th><th class="num">J4 °</th><th class="num">J5 °</th><th class="num">J6 °</th></tr></thead>
+        <tbody><tr><th>Joints</th><td class="num" id="j1">–</td><td class="num" id="j2">–</td><td class="num" id="j3">–</td><td class="num" id="j4">–</td><td class="num" id="j5">–</td><td class="num" id="j6">–</td></tr></tbody>
+      </table></div>
+      <div class="hint" style="margin-top:6px">Configuration <span id="pConfig" class="mono">–</span></div>
+    </div>
+    <div class="card">
+      <h2>Motor current (torque) per axis</h2>
+      <div id="torque"><div class="empty">–</div></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="tabs" role="tablist">
+      <button class="active" data-tab="rw">Read &amp; write</button>
+      <button data-tab="io">I/O panel</button>
+      <button data-tab="watch">Watch list</button>
+      <button data-tab="log">Activity log</button>
+    </div>
+
+    <!-- Read & write -->
+    <div class="tab active" id="tab-rw">
+      <div class="form">
+        <label class="field"><span>What to access</span><select id="rwKind"></select></label>
+        <label class="field" id="fIndex"><span id="fIndexLabel">Index</span><input id="rwIndex" type="number" value="1"></label>
+        <label class="field" id="fGroup"><span>Motion group</span><input id="rwGroup" type="number" value="1" min="1" max="8"></label>
+        <label class="field" id="fCount"><span>How many (read)</span><input id="rwCount" type="number" value="1" min="1" max="1000"></label>
+        <label class="field" id="fMember"><span>Part</span><select id="rwMember"></select></label>
+        <label class="field" id="fPreset" style="grid-column: span 2"><span>Variable</span><select id="rwPreset"></select></label>
+        <label class="field" id="fName"><span>System variable name</span><input id="rwName" type="text" value="$MCR.$GENOVERRIDE" spellcheck="false"></label>
+        <label class="field" id="fDtype"><span>Variable type</span><select id="rwDtype"></select></label>
+      </div>
+      <p class="hint" id="rwHint"></p>
+      <div class="actions" style="margin:6px 0 14px">
+        <span class="muted">Address</span> <span class="address" id="rwAddress">DO[1]</span>
+        <button id="rwRead" class="primary" style="margin-left:auto">Read</button>
+      </div>
+
+      <div id="writeArea">
+        <div class="field"><span>Value to write</span></div>
+        <div id="valueEditor" style="margin:6px 0 10px"></div>
+        <div class="actions"><button id="rwWrite" class="write-btn danger">Write</button><span class="hint" id="writeHint"></span></div>
+      </div>
+      <div class="result" id="rwResult"><span class="muted">Choose an item and press Read.</span></div>
+    </div>
+
+    <!-- I/O panel -->
+    <div class="tab" id="tab-io">
+      <div class="form" style="margin-bottom:14px">
+        <label class="field"><span>Signal type</span><select id="ioKind"></select></label>
+        <label class="field"><span>Start index</span><input id="ioStart" type="number" value="1"></label>
+        <label class="field"><span>Signals shown</span><select id="ioSize"><option>16</option><option selected>32</option><option>64</option></select></label>
+        <div class="actions"><button id="ioPrev">◀ Prev</button><button id="ioNext">Next ▶</button></div>
+      </div>
+      <div class="leds" id="leds"></div>
+      <p class="hint" id="ioHint"></p>
+    </div>
+
+    <!-- Watch -->
+    <div class="tab" id="tab-watch">
+      <div class="actions" style="margin-bottom:12px">
+        <input id="watchInput" type="text" placeholder="e.g. DO[1], R[5], PR[1].x, SR[1], $MCR.$GENOVERRIDE" style="flex:1;min-width:220px" spellcheck="false">
+        <button id="watchAdd" class="primary">Add</button>
+        <button id="watchDemo">Add demo set</button>
+        <button id="watchClear" class="ghost">Clear</button>
+      </div>
+      <table>
+        <thead><tr><th>Address</th><th>Value</th><th>Last change</th><th></th></tr></thead>
+        <tbody id="watchBody"></tbody>
+      </table>
+      <p class="hint">Refreshed every second while this tab is open. The list is saved in this browser.</p>
+    </div>
+
+    <!-- Log -->
+    <div class="tab" id="tab-log">
+      <div class="actions" style="margin-bottom:8px"><span class="hint">Every read and write made from this page.</span><button id="logClear" class="ghost" style="margin-left:auto">Clear</button></div>
+      <div class="log" id="log"></div>
+    </div>
+  </section>
+</main>
+
+<div class="overlay" id="confirmBox">
+  <div class="card">
+    <h2>Confirm write</h2>
+    <p id="confirmText" style="white-space:pre-line"></p>
+    <div class="actions" style="justify-content:flex-end"><button id="confirmNo">Cancel</button><button id="confirmYes" class="danger">Write</button></div>
+  </div>
+</div>
+
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+const state = { catalog: [], members: [], dtypes: [], sysvars: [], connected: false, readOnly: false, tab: "rw", lastPosition: null };
+const BOOL_KINDS = () => state.catalog.filter((c) => c.type === "bool" || c.type === "int");
+
+// ------------------------------------------------------------ helpers
+async function api(path, body) {
+  const opts = body === undefined ? {} : { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) };
+  const res = await fetch(path, opts);
+  let data;
+  try { data = await res.json(); } catch { throw new Error(`Server error ${res.status}`); }
+  if (!data.ok) throw new Error(data.error || `Request failed (${res.status})`);
+  return data;
+}
+const fmt = (v, d = 3) => (typeof v === "number" ? v.toFixed(d) : "–");
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+function duration(sec) {
+  if (sec == null) return "–";
+  const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
+  return h ? `${h} h ${m} min` : m ? `${m} min ${s} s` : `${s} s`;
+}
+function pill(text, cls = "") { return `<span class="pill ${cls}">${esc(text)}</span>`; }
+function yesNo(v, badWhenTrue = true) {
+  if (v == null) return "–";
+  return v ? pill("YES", badWhenTrue ? "bad" : "ok") : pill("no", badWhenTrue ? "ok" : "");
+}
+function positionText(p) {
+  if (!p || (!p.valid_cartesian && !p.valid_joint)) return '<span class="muted">uninitialized</span>';
+  const parts = [];
+  if (p.valid_cartesian) parts.push(`X ${fmt(p.x)}  Y ${fmt(p.y)}  Z ${fmt(p.z)}  W ${fmt(p.w)}  P ${fmt(p.p)}  R ${fmt(p.r)}`);
+  if (p.valid_joint && p.joints) parts.push(p.joints.map((j, i) => `J${i + 1} ${fmt(j)}`).join("  "));
+  return `<div class="mono">${parts.map(esc).join("<br>")}</div>`;
+}
+function valueHtml(v) {
+  if (v === true) return pill("ON", "ok");
+  if (v === false) return pill("OFF");
+  if (v === null || v === undefined) return '<span class="muted">–</span>';
+  if (Array.isArray(v)) return v.map(valueHtml).join(" ");
+  if (typeof v === "object" && "valid_cartesian" in v) return positionText(v);
+  if (typeof v === "object") return `<span class="mono">${esc(memberText(v))}</span>`;
+  if (typeof v === "string") return `<span class="mono">"${esc(v)}"</span>`;
+  return `<span class="mono">${esc(v)}</span>`;
+}
+function memberText(obj) {
+  return Object.entries(obj).map(([k, v]) => `${k.toUpperCase()} ${typeof v === "number" ? +v.toFixed(3) : v}`).join("  ");
+}
+function logLine(text, error = false) {
+  const div = document.createElement("div");
+  div.className = error ? "e" : "";
+  div.textContent = `${new Date().toLocaleTimeString()}  ${text}`;
+  $("log").prepend(div);
+  while ($("log").childElementCount > 300) $("log").lastChild.remove();
+}
+function writesAllowed() { return state.connected && !state.readOnly && $("allowWrites").checked; }
+function store(key, value) { try { localStorage.setItem(key, JSON.stringify(value)); } catch {} }
+function load(key, fallback) { try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; } catch { return fallback; } }
+
+let confirmResolve = null;
+function confirmWrite(text) {
+  $("confirmText").textContent = text;
+  $("confirmBox").style.display = "flex";
+  return new Promise((resolve) => { confirmResolve = resolve; });
+}
+$("confirmYes").onclick = () => { $("confirmBox").style.display = "none"; confirmResolve && confirmResolve(true); };
+$("confirmNo").onclick = () => { $("confirmBox").style.display = "none"; confirmResolve && confirmResolve(false); };
+
+// ------------------------------------------------------------ connection + dashboard
+function renderSession(s) {
+  state.connected = s.connected;
+  state.readOnly = s.read_only;
+  if (document.activeElement !== $("host")) $("host").value = s.host;
+  if (document.activeElement !== $("port")) $("port").value = s.port;
+  $("endpoint").textContent = s.endpoint;
+  const p = $("connPill");
+  p.className = "pill " + (s.connected ? "ok" : "bad");
+  p.lastElementChild.textContent = s.connected ? "Connected" : (s.last_error ? "Disconnected – " + s.last_error.slice(0, 60) : "Disconnected");
+  p.title = s.last_error || "";
+  $("connectBtn").textContent = s.connected ? "Reconnect" : "Connect";
+  $("disconnectBtn").disabled = !s.connected;
+  const info = s.info || {};
+  $("iModel").textContent = info.model || "–";
+  $("iController").textContent = info.controller_model || "–";
+  $("iSoftware").textContent = info.software_revision || info.version || "–";
+  $("iSerial").textContent = info.serial_number || "–";
+  $("iSerial").title = info.note || "";
+  const st = s.stats || {};
+  $("cLast").textContent = st.last_ms != null ? `${st.last_ms} ms` : "–";
+  $("cAvg").textContent = st.avg_ms != null ? `${st.avg_ms} / ${st.max_ms} ms` : "–";
+  $("cRate").textContent = st.per_sec ?? "–";
+  $("cCounts").textContent = st.requests != null ? `${st.reads} · ${st.writes} · ${st.errors}` : "–";
+  $("cFor").textContent = duration(s.connected_for_s);
+  renderLatency(st.history || []);
+  if (state.readOnly) { $("allowWrites").checked = false; $("allowWrites").disabled = true; $("writesLabel").textContent = "Read-only server"; }
+  updateWriteButtons();
+}
+
+function renderLive(d) {
+  renderSession(d);
+  $("cCycle").textContent = d.cycle_ms != null ? `${d.cycle_ms} ms` : "–";
+  const s = d.status;
+  const missing = d.unavailable || {};
+  if (!s && d.connected && missing.status) {
+    $("sChips").innerHTML = pill("Not available", "warn");
+    $("sMode").textContent = "Needs 7DF1/P28+";
+  }
+  if (!s && d.connected) {
+    renderProgramPosition(d);
+    $("alarmBox").style.display = "none";
+    return;
+  }
+  if (!s) {
+    for (const id of ["sMode", "sServo", "sEstop", "sPstop", "sOverride", "pName", "pState", "pLine", "pParent", "iUptime"]) $(id).textContent = "–";
+    $("sChips").innerHTML = pill("No data");
+    $("alarmBox").style.display = "none";
+    return;
+  }
+  const flags = s.state_flags || [];
+  $("iUptime").textContent = duration(s.uptime_minutes * 60);
+  $("sMode").innerHTML = pill(s.mode, s.mode === "Auto" ? "info" : "warn");
+  $("sServo").innerHTML = s.servo_on ? pill("ON", "ok") : pill("OFF", "warn");
+  $("sEstop").innerHTML = yesNo(flags.includes("E_STOP"));
+  $("sPstop").innerHTML = yesNo(s.protective_stop);
+  const flagClass = { E_STOP: "bad", FAULT: "bad", RUNNING: "ok", PAUSED: "warn", HELD: "warn", BATTERY_ALARM: "warn", ABORTED: "", TP_ENABLED: "info", BUSY: "info" };
+  $("sChips").innerHTML = flags.length ? flags.map((f) => pill(f.replace("_", " "), flagClass[f] || "")).join("") : pill("OK", "ok");
+  $("sOverride").textContent = s.speed_override;
+  $("sOverrideBar").style.width = `${s.speed_override}%`;
+
+  const ab = $("alarmBox");
+  if (s.alarms && s.alarms.length) {
+    ab.innerHTML = `⚠ Active alarm${s.alarms.length > 1 ? "s" : ""}<ul>${s.alarms.map((a) => `<li>${esc(a)}</li>`).join("")}</ul>`;
+    ab.style.display = "block";
+  } else ab.style.display = "none";
+
+  renderProgramPosition(d);
+  const t = s.torque || [];
+  const tmax = Math.max(1, ...t.map(Math.abs));
+  $("torque").innerHTML = t.length ? t.map((v, i) =>
+    `<div class="torque-row"><span class="mono">J${i + 1}</span><div class="bar"><span style="width:${(Math.abs(v) / tmax) * 100}%"></span></div><span class="mono" style="text-align:right">${fmt(v, 2)} A</span></div>`
+  ).join("") : '<div class="empty">No data</div>';
+}
+
+function renderProgramPosition(d) {
+  const pr = d.program || {};
+  $("pName").textContent = pr.program || "(none)";
+  $("pState").innerHTML = pill(pr.state || "–", { RUNNING: "ok", PAUSED: "warn", ABORTED: "" }[pr.state] || "");
+  $("pLine").textContent = pr.program ? pr.line : "–";
+  $("pParent").textContent = pr.parent_program || "–";
+
+  const pos = d.position;
+  state.lastPosition = pos;
+  if (pos) {
+    for (const k of ["x", "y", "z", "w", "p", "r"]) $("p" + k).textContent = pos.valid_cartesian ? fmt(pos[k]) : "–";
+    (pos.joints || []).slice(0, 6).forEach((j, i) => { $("j" + (i + 1)).textContent = fmt(j); });
+    const c = pos.config || {};
+    $("pConfig").textContent = `${c.flip ? "F" : "N"} ${c.left ? "L" : "R"} ${c.up ? "U" : "D"} ${c.front ? "T" : "B"}, ${c.turn4}, ${c.turn5}, ${c.turn6}`;
+  }
+}
+
+// ------------------------------------------------------------ latency chart
+const OPS = {
+  status:   { label: "Robot status", color: "var(--s1)", note: "about 10 OPC UA reads" },
+  program:  { label: "Program status", color: "var(--s2)", note: "1 register read" },
+  position: { label: "Current position", color: "var(--s3)", note: "1 register read" },
+  manual:   { label: "Your reads & writes", color: "var(--s4)", note: "from the tabs below" },
+};
+let latBars = [];
+function niceMax(v) {
+  const p = 10 ** Math.floor(Math.log10(v));
+  for (const m of [1, 2, 2.5, 5, 10]) if (m * p >= v) return m * p;
+  return 10 * p;
+}
+function renderLatency(history) {
+  const svg = $("latSvg");
+  const W = Math.max(200, $("latPlot").clientWidth), H = 140, left = 44, top = 8, bottom = 4;
+  const plotW = W - left - 2, plotH = H - top - bottom;
+  const slots = Math.max(10, Math.min(60, Math.floor(plotW / 9)));
+  latBars = history.slice(-slots);
+  const ceil = niceMax(Math.max(1, ...latBars.map((b) => b[0])));
+  const y = (v) => top + plotH * (1 - v / ceil);
+  const slot = plotW / slots, bw = Math.min(24, Math.max(3, slot - 2));
+  let out = "";
+  for (const t of [0, ceil / 2, ceil]) {
+    out += `<line class="${t ? "gridline" : "baseline"}" x1="${left}" x2="${W - 2}" y1="${y(t)}" y2="${y(t)}"/>`;
+    out += `<text class="tick" x="${left - 6}" y="${y(t) + 4}" text-anchor="end">${+t.toFixed(2)} ms</text>`;
+  }
+  latBars.forEach(([ms, op, ok], i) => {
+    const x = left + plotW - (latBars.length - i) * slot + (slot - bw) / 2;
+    const h = Math.max(1, (ms / ceil) * plotH), yt = top + plotH - h, r = Math.min(4, bw / 2, h);
+    const d = `M${x},${top + plotH} V${yt + r} Q${x},${yt} ${x + r},${yt} H${x + bw - r} Q${x + bw},${yt} ${x + bw},${yt + r} V${top + plotH} Z`;
+    out += `<rect class="hit" data-i="${i}" x="${left + plotW - (latBars.length - i) * slot}" y="${top}" width="${slot}" height="${plotH}"/>`;
+    out += `<path class="bar" d="${d}" fill="${(OPS[op] || OPS.manual).color}" ${ok ? "" : 'fill-opacity="0.35"'}/>`;
+  });
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  svg.innerHTML = out;
+
+  const seen = {};
+  for (const [ms, op] of latBars) (seen[op] = seen[op] || []).push(ms);
+  $("latLegend").innerHTML = Object.keys(OPS).filter((op) => seen[op]).map((op) => {
+    const v = seen[op], avg = v.reduce((a, b) => a + b, 0) / v.length;
+    return `<span class="item"><span class="sw" style="background:${OPS[op].color}"></span>${OPS[op].label} <span class="muted">avg</span> <b>${avg.toFixed(1)} ms</b></span>`;
+  }).join("") || '<span class="muted">No requests yet</span>';
+}
+$("latPlot").addEventListener("mousemove", (e) => {
+  const hit = e.target.closest(".hit");
+  const tip = $("latTip");
+  if (!hit) { tip.style.display = "none"; return; }
+  const [ms, op, ok, ago] = latBars[Number(hit.dataset.i)];
+  const o = OPS[op] || OPS.manual;
+  tip.innerHTML = `<div><span class="sw" style="background:${o.color}"></span><b>${o.label}</b>${ok ? "" : ' <span class="pill bad">failed</span>'}</div>
+    <div><b class="mono">${ms} ms</b> <span class="muted">· ${ago < 1 ? "just now" : ago + " s ago"} · ${o.note}</span></div>`;
+  tip.style.display = "block";
+  const box = $("latPlot").getBoundingClientRect();
+  const x = e.clientX - box.left;
+  tip.style.left = `${Math.min(Math.max(0, x - tip.offsetWidth / 2), box.width - tip.offsetWidth)}px`;
+  tip.style.top = `${e.clientY - box.top - tip.offsetHeight - 12}px`;
+});
+$("latPlot").addEventListener("mouseleave", () => { $("latTip").style.display = "none"; });
+
+async function pollLive() {
+  try {
+    renderLive(await api("/api/live"));
+  } catch (e) {
+    $("connPill").className = "pill bad";
+    $("connPill").lastElementChild.textContent = "GUI server not reachable";
+  }
+  setTimeout(pollLive, 1000);
+}
+
+$("connectBtn").onclick = async () => {
+  $("connectBtn").disabled = true;
+  $("connPill").lastElementChild.textContent = "Connecting…";
+  try {
+    const s = await api("/api/connect", { host: $("host").value.trim(), port: Number($("port").value) });
+    renderSession(s);
+    logLine(`Connected to ${s.endpoint}`);
+  } catch (e) {
+    logLine(`Connect failed: ${e.message}`, true);
+    alert(e.message);
+  } finally { $("connectBtn").disabled = false; }
+};
+$("disconnectBtn").onclick = async () => {
+  try { renderSession(await api("/api/disconnect", {})); logLine("Disconnected"); } catch (e) { logLine(e.message, true); }
+};
+
+$("allowWrites").checked = load("allowWrites", false);
+$("allowWrites").onchange = () => { store("allowWrites", $("allowWrites").checked); updateWriteButtons(); };
+function updateWriteButtons() {
+  const ok = writesAllowed();
+  $("writesLabel").textContent = state.readOnly ? "Read-only server" : ok ? "Writes enabled" : "Writes locked";
+  document.querySelectorAll(".write-btn").forEach((b) => {
+    const item = currentItem();
+    b.disabled = !ok || (b.id === "rwWrite" && item && !itemWritable());
+  });
+  $("writeHint").textContent = !state.connected ? "Not connected" : state.readOnly ? "Server started read-only" :
+    !$("allowWrites").checked ? "Unlock writes with the switch at the top of the page" : "";
+  renderLeds();
+}
+
+$("overrideSlider").oninput = () => { $("overrideNew").textContent = $("overrideSlider").value + "%"; };
+$("overrideSet").onclick = async () => {
+  const v = $("overrideSlider").value;
+  if (!(await confirmWrite(`Set the robot speed override to ${v}%?`))) return;
+  doWrite("$MCR.$GENOVERRIDE", v, "int");
+};
+
+// ------------------------------------------------------------ read & write
+function currentItem() { return state.catalog.find((c) => c.kind === $("rwKind").value); }
+function currentPreset() { return state.sysvars[Number($("rwPreset").value)] || null; }
+function itemWritable() {
+  const item = currentItem();
+  if (!item || !item.writable) return false;
+  if (item.kind === "$") { const p = currentPreset(); return p ? p.write : $("rwDtype").value !== "pos"; }
+  return true;
+}
+
+function buildAddress() {
+  const item = currentItem();
+  if (!item) return "";
+  if (item.kind === "$") return $("rwName").value.trim();
+  const idx = $("rwIndex").value;
+  const g = Number($("rwGroup").value || 1);
+  const group = (item.kind === "PR" || item.kind === "POS") && g > 1 ? `G${g}:` : "";
+  const member = (item.type === "position" && $("rwMember").value) ? "." + $("rwMember").value : "";
+  return `${item.kind}[${group}${idx}]${member}`;
+}
+
+function setupForm() {
+  const item = currentItem();
+  const isPos = item.type === "position";
+  $("fIndex").style.display = item.kind === "$" ? "none" : "";
+  $("fIndexLabel").textContent = item.kind === "POS" ? "User frame (0 = world, -1 = active)" : `Index (${item.first}–${item.last})`;
+  $("rwIndex").min = item.first ?? 0;
+  $("rwIndex").max = item.last ?? 0;
+  if (item.kind === "POS" && Number($("rwIndex").value) > 61) $("rwIndex").value = 0;
+  if (item.first != null && Number($("rwIndex").value) < item.first) $("rwIndex").value = item.first;
+  $("fGroup").style.display = isPos ? "" : "none";
+  $("fCount").style.display = item.count && !$("rwMember").value ? "" : "none";
+  $("fMember").style.display = isPos ? "" : "none";
+  const preset = item.kind === "$" ? currentPreset() : null;
+  if (preset) { $("rwName").value = preset.name; $("rwDtype").value = preset.dtype; }
+  $("fPreset").style.display = item.kind === "$" ? "" : "none";
+  $("fName").style.display = item.kind === "$" && !preset ? "" : "none";
+  $("fDtype").style.display = item.kind === "$" && !preset ? "" : "none";
+  $("writeArea").style.display = itemWritable() ? "" : "none";
+  const hints = {
+    bool: "ON/OFF signal.", int: "Whole number (16 bit).", number: "Write a whole number to store an integer, or a decimal (e.g. 2.5) to store a real.",
+    string: "Text up to 79 characters.", position: "XYZWPR in mm/deg plus joint angles. Pick a part to read or write a single value.",
+    sysvar: preset ? `${preset.name} (${{ int: "integer", real: "real", bool: "boolean", str: "string", pos: "position" }[preset.dtype]}).`
+      : "Type the exact name and choose the type shown on the teach pendant. Unknown names read as 0 without an error.",
+  };
+  const readOnlyNote = item.kind === "$" && preset && !preset.write ? " Shown read only in this GUI."
+    : item.writable ? "" : " This item is read only over OPC UA.";
+  $("rwHint").textContent = (hints[item.type] || "") + readOnlyNote;
+  buildValueEditor();
+  $("rwAddress").textContent = buildAddress();
+  updateWriteButtons();
+}
+
+function buildValueEditor() {
+  const item = currentItem();
+  const ed = $("valueEditor");
+  const member = $("rwMember").value;
+  const dtype = $("rwDtype").value;
+  let kind = item.type;
+  if (kind === "position" && member) kind = "number";
+  if (kind === "sysvar") kind = { int: "int", real: "number", bool: "bool", str: "string", pos: "none" }[dtype];
+  if (kind === "bool") {
+    ed.innerHTML = `<div class="actions"><label><input type="radio" name="bv" value="on" checked> ON</label><label><input type="radio" name="bv" value="off"> OFF</label></div>`;
+  } else if (kind === "int" || kind === "number") {
+    ed.innerHTML = `<input id="vNum" type="text" value="0" style="width:200px" class="mono" inputmode="decimal">`;
+  } else if (kind === "string") {
+    ed.innerHTML = `<input id="vStr" type="text" maxlength="79" style="width:100%;max-width:520px" placeholder="Text to write">`;
+  } else if (kind === "position") {
+    const cart = ["x", "y", "z", "w", "p", "r"].map((k) => `<label>${k.toUpperCase()}<input data-m="${k}" type="text" class="mono" aria-label="${k.toUpperCase()}"></label>`).join("");
+    const joints = [1, 2, 3, 4, 5, 6].map((n) => `<label>J${n}<input data-m="j${n}" type="text" class="mono" aria-label="J${n}"></label>`).join("");
+    ed.innerHTML = `<div class="actions" style="margin-bottom:8px">
+        <label><input type="radio" name="pmode" value="cart" checked> Cartesian (XYZWPR)</label>
+        <label><input type="radio" name="pmode" value="joint"> Joint (J1–J6)</label>
+        <button id="fillCurrent" type="button">Fill with current position</button>
+        <button id="fillRead" type="button">Fill with last read value</button></div>
+      <div class="posgrid" id="pgCart">${cart}</div>
+      <div class="posgrid" id="pgJoint" style="display:none">${joints}</div>
+      <p class="hint">Only the fields you fill in are written; empty fields keep their current value.</p>`;
+    ed.querySelectorAll('input[name=pmode]').forEach((r) => r.onchange = () => {
+      const j = ed.querySelector('input[name=pmode]:checked').value === "joint";
+      $("pgCart").style.display = j ? "none" : ""; $("pgJoint").style.display = j ? "" : "none";
+    });
+    const fill = (p) => {
+      if (!p) return;
+      const r3 = (v) => String(+Number(v).toFixed(3));
+      ["x", "y", "z", "w", "p", "r"].forEach((k) => { ed.querySelector(`[data-m=${k}]`).value = p.valid_cartesian ? r3(p[k]) : ""; });
+      (p.joints || []).slice(0, 6).forEach((j, i) => { ed.querySelector(`[data-m=j${i + 1}]`).value = p.valid_joint ? r3(j) : ""; });
+    };
+    $("fillCurrent").onclick = () => fill(state.lastPosition);
+    $("fillRead").onclick = () => fill(state.lastReadPosition);
+  } else {
+    ed.innerHTML = `<span class="hint">This type cannot be written from the GUI.</span>`;
+  }
+}
+
+function editorValue() {
+  const ed = $("valueEditor");
+  const r = ed.querySelector("input[name=bv]:checked");
+  if (r) return r.value;
+  if ($("vNum")) { const v = $("vNum").value.trim(); if (v === "" || isNaN(Number(v))) throw new Error("Enter a number"); return v; }
+  if ($("vStr")) return $("vStr").value;
+  if ($("pgCart")) {
+    const joint = ed.querySelector("input[name=pmode]:checked").value === "joint";
+    const out = {};
+    $(joint ? "pgJoint" : "pgCart").querySelectorAll("input").forEach((i) => {
+      const v = i.value.trim();
+      if (v !== "") { if (isNaN(Number(v))) throw new Error(`${i.dataset.m.toUpperCase()} is not a number`); out[i.dataset.m] = Number(v); }
+    });
+    if (!Object.keys(out).length) throw new Error("Fill in at least one field");
+    return out;
+  }
+  throw new Error("Nothing to write");
+}
+
+async function doRead() {
+  const item = currentItem();
+  const address = buildAddress();
+  const count = $("fCount").style.display === "none" ? 1 : Number($("rwCount").value || 1);
+  const dtype = item.kind === "$" ? $("rwDtype").value : null;
+  const res = $("rwResult");
+  try {
+    const d = await api("/api/read", { address, count, dtype });
+    const firstValue = Array.isArray(d.value) ? d.value[0] : d.value;
+    if (firstValue && typeof firstValue === "object" && "valid_cartesian" in firstValue) state.lastReadPosition = firstValue;
+    let body;
+    if (Array.isArray(d.value)) {
+      const start = Number($("rwIndex").value);
+      body = `<table><tbody>${d.value.map((v, i) => `<tr><td class="mono">${item.kind}[${start + i}]</td><td>${valueHtml(v)}</td></tr>`).join("")}</tbody></table>`;
+    } else body = `<div style="font-size:18px">${valueHtml(d.value)}</div>`;
+    res.className = "result";
+    res.innerHTML = `<div class="actions" style="margin-bottom:6px"><b class="mono">${esc(address)}</b>${count > 1 ? ` <span class="muted">× ${count}</span>` : ""}<span class="hint" style="margin-left:auto">read in ${d.ms} ms</span></div>${body}`;
+    logLine(`READ  ${address}${count > 1 ? " ×" + count : ""} = ${JSON.stringify(d.value).slice(0, 120)}  (${d.ms} ms)`);
+  } catch (e) {
+    res.className = "result err";
+    res.textContent = e.message;
+    logLine(`READ  ${address} failed: ${e.message}`, true);
+  }
+}
+
+async function doWrite(address, value, dtype) {
+  const res = $("rwResult");
+  try {
+    const d = await api("/api/write", { address, value, dtype });
+    res.className = "result";
+    res.innerHTML = `<div class="actions" style="margin-bottom:6px"><b class="mono">${esc(address)}</b> ${pill("WRITTEN", "ok")}<span class="hint" style="margin-left:auto">write took ${d.ms} ms</span></div>
+      <div class="kv" style="grid-template-columns:auto 1fr"><span class="muted">Sent</span><div>${valueHtml(d.written)}</div><span class="muted">Read back</span><div>${valueHtml(d.readback)}</div></div>`;
+    logLine(`WRITE ${address} = ${typeof d.written === "object" && d.written ? memberText(d.written) : JSON.stringify(d.written)} → read back ${JSON.stringify(d.readback).slice(0, 100)}  (${d.ms} ms)`);
+    return d;
+  } catch (e) {
+    res.className = "result err";
+    res.textContent = e.message;
+    logLine(`WRITE ${address} failed: ${e.message}`, true);
+  }
+}
+
+$("rwRead").onclick = doRead;
+$("rwWrite").onclick = async () => {
+  const item = currentItem();
+  const address = buildAddress();
+  let value;
+  try { value = editorValue(); } catch (e) { $("rwResult").className = "result err"; $("rwResult").textContent = e.message; return; }
+  if (item.kind === "PR" || item.kind === "$") {
+    const what = item.kind === "PR" ? "This changes a position register that robot programs may move to." : "This changes a controller system variable.";
+    const shown = typeof value === "object" ? memberText(value) : value;
+    if (!(await confirmWrite(`${what}\n\nWrite ${shown} to ${address}?`))) return;
+  }
+  doWrite(address, value, item.kind === "$" ? $("rwDtype").value : null);
+};
+for (const id of ["rwKind", "rwMember", "rwDtype", "rwPreset"]) $(id).addEventListener("change", setupForm);
+for (const id of ["rwIndex", "rwGroup", "rwName"]) $(id).addEventListener("input", () => { $("rwAddress").textContent = buildAddress(); });
+
+// ------------------------------------------------------------ I/O panel
+let ledValues = [];
+function ioItem() { return state.catalog.find((c) => c.kind === $("ioKind").value); }
+function renderLeds() {
+  const item = ioItem();
+  if (!item) return;
+  const start = Number($("ioStart").value);
+  const clickable = item.type === "bool" && item.writable && writesAllowed();
+  $("leds").innerHTML = ledValues.map((v, i) => {
+    const on = item.type === "bool" ? v : null;
+    return `<div class="led ${on ? "on" : ""} ${clickable ? "click" : ""}" data-i="${i}">${item.type === "bool" ? "<i></i>" : `<div class="v">${v}</div>`}${item.kind}[${start + i}]</div>`;
+  }).join("") || '<div class="empty">Not connected</div>';
+  $("ioHint").textContent = item.type === "bool"
+    ? (item.writable ? (writesAllowed() ? "Click a signal to toggle it." : "Unlock writes at the top to toggle outputs by clicking.") : "Inputs are read only over OPC UA.")
+    : "Values refresh twice a second.";
+}
+$("leds").onclick = async (e) => {
+  const led = e.target.closest(".led.click");
+  if (!led) return;
+  const item = ioItem();
+  const i = Number(led.dataset.i);
+  const address = `${item.kind}[${Number($("ioStart").value) + i}]`;
+  const d = await doWrite(address, ledValues[i] ? "off" : "on");
+  if (d) { ledValues[i] = d.readback; renderLeds(); }
+};
+async function pollIo() {
+  if (state.tab === "io" && state.connected) {
+    const item = ioItem();
+    const size = Number($("ioSize").value);
+    const start = Number($("ioStart").value);
+    const count = Math.max(1, Math.min(size, item.last - start + 1));
+    try {
+      const d = await api("/api/read", { address: `${item.kind}[${start}]`, count });
+      ledValues = d.value;
+      renderLeds();
+    } catch (e) { $("ioHint").textContent = e.message; }
+  }
+  setTimeout(pollIo, 500);
+}
+function ioClamp() {
+  const item = ioItem();
+  let s = Number($("ioStart").value);
+  s = Math.max(item.first, Math.min(item.last, isNaN(s) ? item.first : s));
+  $("ioStart").value = s;
+}
+$("ioKind").onchange = () => { $("ioStart").value = ioItem().first; ledValues = []; renderLeds(); };
+$("ioStart").onchange = ioClamp;
+$("ioPrev").onclick = () => { $("ioStart").value = Number($("ioStart").value) - Number($("ioSize").value); ioClamp(); };
+$("ioNext").onclick = () => { $("ioStart").value = Number($("ioStart").value) + Number($("ioSize").value); ioClamp(); };
+
+// ------------------------------------------------------------ watch list
+let watch = load("watch", []);
+const watchState = {};
+function renderWatch() {
+  $("watchBody").innerHTML = watch.length ? watch.map((a, i) => {
+    const w = watchState[a] || {};
+    return `<tr id="w${i}"><td class="mono"><b>${esc(a)}</b></td><td>${w.error ? `<span class="muted">${esc(w.error)}</span>` : valueHtml(w.value)}</td>
+      <td class="muted">${w.changed ? new Date(w.changed).toLocaleTimeString() : "–"}</td>
+      <td style="text-align:right"><button class="ghost" data-rm="${i}" title="Remove">✕</button></td></tr>`;
+  }).join("") : '<tr><td colspan="4" class="empty">Nothing watched yet. Add an address, or try the demo set.</td></tr>';
+}
+$("watchBody").onclick = (e) => {
+  const rm = e.target.dataset.rm;
+  if (rm !== undefined) { watch.splice(Number(rm), 1); store("watch", watch); renderWatch(); }
+};
+function addWatch(list) {
+  for (const a of list) if (a && !watch.includes(a)) watch.push(a);
+  store("watch", watch);
+  renderWatch();
+}
+$("watchAdd").onclick = () => { addWatch($("watchInput").value.split(",").map((s) => s.trim()).filter(Boolean)); $("watchInput").value = ""; };
+$("watchInput").onkeydown = (e) => { if (e.key === "Enter") $("watchAdd").click(); };
+$("watchDemo").onclick = () => addWatch(["DO[1]", "DO[2]", "UI[1]", "F[1]", "R[1]", "SR[1]", "PR[1].x", "POS.z", "$MCR.$GENOVERRIDE"]);
+$("watchClear").onclick = () => { watch = []; store("watch", watch); renderWatch(); };
+async function pollWatch() {
+  if (state.tab === "watch" && state.connected && watch.length) {
+    try {
+      const d = await api("/api/read_many", { addresses: watch });
+      const now = Date.now();
+      const changed = [];
+      for (const a of watch) {
+        const prev = watchState[a];
+        const value = d.values[a];
+        const error = d.errors[a];
+        const same = prev && JSON.stringify(prev.value) === JSON.stringify(value);
+        watchState[a] = { value, error, changed: prev && !same ? now : prev ? prev.changed : null };
+        if (prev && !same) changed.push(a);
+      }
+      renderWatch();
+      changed.forEach((a) => { const row = $("w" + watch.indexOf(a)); if (row) row.classList.add("flash"); });
+    } catch {}
+  }
+  setTimeout(pollWatch, 1000);
+}
+
+// ------------------------------------------------------------ tabs + init
+document.querySelectorAll(".tabs button").forEach((b) => b.onclick = () => {
+  document.querySelectorAll(".tabs button").forEach((x) => x.classList.toggle("active", x === b));
+  document.querySelectorAll(".tab").forEach((t) => t.classList.toggle("active", t.id === "tab-" + b.dataset.tab));
+  state.tab = b.dataset.tab;
+  if (state.tab === "watch") renderWatch();
+});
+$("logClear").onclick = () => { $("log").innerHTML = ""; };
+
+async function init() {
+  const c = await api("/api/catalog");
+  state.catalog = c.items; state.members = c.members; state.dtypes = c.dtypes; state.sysvars = c.sysvars || [];
+  const svGroups = {};
+  state.sysvars.forEach((v, i) => (svGroups[v.group] = svGroups[v.group] || []).push(`<option value="${i}">${esc(v.label)} — ${esc(v.name)}</option>`));
+  $("rwPreset").innerHTML = Object.entries(svGroups).map(([g, o]) => `<optgroup label="${esc(g)}">${o.join("")}</optgroup>`).join("")
+    + `<optgroup label="Other"><option value="custom">Custom name…</option></optgroup>`;
+  const groups = {};
+  for (const item of c.items) (groups[item.group] = groups[item.group] || []).push(item);
+  $("rwKind").innerHTML = Object.entries(groups).map(([g, items]) =>
+    `<optgroup label="${esc(g)}">${items.map((i) => `<option value="${i.kind}">${esc(i.label)}${i.writable ? "" : " (read only)"}</option>`).join("")}</optgroup>`).join("");
+  $("rwKind").value = "DO";
+  $("rwMember").innerHTML = `<option value="">Whole position</option>` + c.members.map((m) => `<option value="${m}">${m.toUpperCase()}</option>`).join("");
+  $("rwDtype").innerHTML = c.dtypes.map((t) => `<option value="${t}">${{ int: "Integer", real: "Real", bool: "Boolean", str: "String", pos: "Position (read only here)" }[t] || t}</option>`).join("");
+  $("ioKind").innerHTML = BOOL_KINDS().map((i) => `<option value="${i.kind}">${esc(i.label)}${i.writable ? "" : " (read only)"}</option>`).join("");
+  $("ioKind").value = "DO";
+  $("ioStart").value = 1;
+  setupForm();
+  renderWatch();
+  renderSession((await api("/api/session")));
+  pollLive();
+  pollIo();
+  pollWatch();
+}
+init().catch((e) => { $("rwResult").className = "result err"; $("rwResult").textContent = "Could not start: " + e.message; });
+</script>
+</body>
+</html>

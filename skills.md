@@ -71,3 +71,15 @@ fanuc-opcua watch DO[1] R[5] [-i SECONDS]
 - 32-bit values use two words, low word first. Strings pack the first character in the low byte.
 - A position uses 50 words: x..r, e1..e3 (floats), flip/left/up/front/turn4-6, VALIDC (word 26),
   j1..j9 (words 27-44), VALIDJ, UF, UT. `PR[1]@27.12` extracts only the joint words.
+
+## Browser GUI
+
+```bash
+pip install "fanuc-opcua[web] @ git+https://github.com/kumar-nikhil/fanuc-opcua-lib.git"
+fanuc-opcua web [--host IP] [--read-only] [--http-port 8080] [--bind 127.0.0.1]
+```
+
+Code: `fanuc_opcua/web/server.py` (aiohttp, one shared `RobotSession`) and the single offline page
+`fanuc_opcua/web/static/index.html`. JSON API: `GET /api/catalog`, `/api/session`, `/api/live`;
+`POST /api/connect`, `/api/disconnect`, `/api/read`, `/api/read_many`, `/api/write`.
+`--read-only` makes `/api/write` return 403. Restart the server after code changes.
