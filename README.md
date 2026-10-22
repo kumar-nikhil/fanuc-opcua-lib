@@ -191,9 +191,20 @@ The raw arrays are available through `robot.transport` (`read_array`, `write_arr
 
 ## Testing
 
+For a readable end-to-end check against ROBOGUIDE, run the master check script. It prints every value
+it reads, writes and reads back, then a PASS/FAIL summary:
+
 ```bash
-pytest                                     # unit tests, no robot needed
-FANUC_TEST_HOST=127.0.0.2 pytest -m roboguide   # live tests against ROBOGUIDE
+python examples/roboguide_check.py                 # ROBOGUIDE at 127.0.0.2
+python examples/roboguide_check.py --host 10.0.0.5 # another controller
+python examples/roboguide_check.py --read-only     # no writes
+```
+
+Automated tests:
+
+```bash
+pytest -v                                         # unit tests, no robot needed
+FANUC_TEST_HOST=127.0.0.2 pytest -v -m roboguide  # live tests against ROBOGUIDE
 ```
 
 The live tests write to DO[100], F[100], R[100]–R[102], SR[20] and PR[100], and restore the
