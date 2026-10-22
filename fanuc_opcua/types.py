@@ -109,6 +109,11 @@ class RobotStatus:
     protective_stop: Optional[bool] = None
 
     @property
+    def state_flags(self) -> List[str]:
+        """Names of the set state bits, e.g. ['PAUSED', 'FAULT'] for state 40."""
+        return [f.name for f in OperationState if f in self.state]
+
+    @property
     def e_stop(self) -> bool:
         return OperationState.E_STOP in self.state
 

@@ -1,7 +1,8 @@
 import pytest
 
-from fanuc_opcua.cli import build_parser, parse_assignment
+from fanuc_opcua.cli import build_parser, parse_assignment, to_jsonable
 from fanuc_opcua.errors import FanucError
+from fanuc_opcua.types import OperationState, RobotStatus
 
 
 @pytest.mark.parametrize("text, expected", [
@@ -37,3 +38,14 @@ def test_options_before_or_after_subcommand(monkeypatch):
     a = p.parse_args(["read", "DO[1]", "--json", "--host", "10.0.0.2"])
     assert a.host == "10.0.0.2" and a.json
     assert p.parse_args(["info"]).host == "127.0.0.2"
+
+
+def test_status_json_has_flag_names():
+    status = RobotStatus(mode="Auto", servo_on=True, speed_override=100, state=OperationState(40),
+                         alarms=["MOTN-018 Position not reachable (G:1)"], joint_positions=[],
+                         torque=[], uptime_minutes=1)
+    data = to_jsonable(status)
+    assert data["state"] == 40
+    assert data["state_flags"] == ["PAUSED", "FAULT"]
+    assert list(data)[:5] == ["mode", "servo_on", "speed_override", "state", "state_flags"]
+    assert to_jsonable(RobotStatus("T1", False, 10, OperationState(0), [], [], [], 0))["state_flags"] == []

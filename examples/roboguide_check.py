@@ -109,11 +109,10 @@ def main() -> int:
 
         def status():
             s = robot.status()
-            flags = [f.name for f in type(s.state) if f in s.state and f.value]
             rep.info("mode", s.mode)
             rep.info("servo", "ON" if s.servo_on else "OFF")
             rep.info("speed override", f"{s.speed_override}%")
-            rep.info("state flags", ", ".join(flags) or "-")
+            rep.info("state flags", ", ".join(s.state_flags) or "-")
             rep.info("e-stop", s.e_stop)
             rep.info("protective stop", s.protective_stop)
             rep.info("alarms", "; ".join(s.alarms) or "none")

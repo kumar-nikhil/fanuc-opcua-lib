@@ -22,12 +22,18 @@ from .addresses import BOOL_IO, IO_AREAS, parse_address
 from .client import SYSVAR_TYPES, FanucClient, _to_bool
 from .errors import FanucError
 from .nodes import DEFAULT_PORT, ROBOGUIDE_HOST
-from .types import Position
+from .types import Position, RobotStatus
 
 HOST_ENV = "FANUC_HOST"
 
 
 def to_jsonable(value: Any) -> Any:
+    if isinstance(value, RobotStatus):
+        # Keep the raw "state" number and add readable flag names next to it.
+        data = {k: to_jsonable(v) for k, v in dataclasses.asdict(value).items()}
+        items = list(data.items())
+        at = [k for k, _ in items].index("state") + 1
+        return dict(items[:at] + [("state_flags", value.state_flags)] + items[at:])
     if dataclasses.is_dataclass(value):
         return {k: to_jsonable(v) for k, v in dataclasses.asdict(value).items()}
     if isinstance(value, enum.Enum):
@@ -94,11 +100,10 @@ async def _run(args: argparse.Namespace) -> int:
             if args.json:
                 _emit(args, status)
             else:
-                flags = [f.name for f in type(status.state) if f in status.state and f.value]
                 print(f"mode            {status.mode}")
                 print(f"servo           {'ON' if status.servo_on else 'OFF'}")
                 print(f"speed override  {status.speed_override}%")
-                print(f"state           {', '.join(flags) or '-'}")
+                print(f"state           {', '.join(status.state_flags) or '-'}")
                 print(f"protective stop {status.protective_stop}")
                 print(f"alarms          {'; '.join(status.alarms) or '-'}")
                 print(f"joints          {status.joint_positions}")
