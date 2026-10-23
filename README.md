@@ -95,6 +95,8 @@ to them are ignored without an error. That is how the controller behaves (manual
 `FanucClient` is asynchronous (`asyncio`). `FanucClientSync` has exactly the same methods and
 blocks instead, for scripts that do not use `asyncio`.
 
+The full reference — every method, parameter, data type and error — is in **[docs/API.md](docs/API.md)**.
+
 ### Connect
 
 ```python
